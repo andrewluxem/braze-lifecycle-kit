@@ -1,0 +1,99 @@
+{% comment %}
+=====================================================================
+ 03 · Browse Abandonment · snippets.liquid
+ Canvas: CANVAS | Browse Abandonment | v1
+ Brand:  Northwind Supply Co. (fictional)
+
+ Data sources, in order of trust
+ 1. Catalog `products` (current price_display, stock, rating): source of
+    truth. price_display is a preformatted string such as "$49.90", so
+    Liquid never has to format currency.
+ 2. Entry properties {{canvas_entry_properties.${...}}}: name, url,
+    image_url as fallbacks only. The event `price` is NEVER displayed.
+ If the catalog has no row for the product, the email renders without
+ a price. If the catalog says out of stock, the step aborts.
+=====================================================================
+{% endcomment %}
+
+
+{% comment %} ================== BEGIN EM_BROWSE_S1 ==================
+ Step 1 · T+4h · Email · bookmark the viewed product
+ Subject:   {{product_name}} is still here
+            (subject-field Liquid:
+             {{canvas_entry_properties.${name} | strip | default: 'That item you liked'}} is still here)
+ Preheader: Right where you left it.
+{% endcomment %}
+{%- assign pid = canvas_entry_properties.${product_id} | strip -%}
+{%- if pid == blank -%}
+  {% abort_message('EM_BROWSE_S1: product_id missing from entry properties') %}
+{%- endif -%}
+{%- if custom_attribute.${purchased_product_ids_90d} contains pid -%}
+  {% abort_message('EM_BROWSE_S1: product bought in last 90 days') %}
+{%- endif -%}
+{% catalog_items products {{pid}} %}
+{%- assign item = items[0] -%}
+{%- if item != blank and item.in_stock == false -%}
+  {% abort_message('EM_BROWSE_S1: product out of stock') %}
+{%- endif -%}
+{%- assign product_name = item.name | default: canvas_entry_properties.${name} | strip -%}
+{%- assign product_url = item.url | default: canvas_entry_properties.${url} | strip -%}
+{%- assign product_img = item.image_url | default: canvas_entry_properties.${image_url} | strip -%}
+{%- if product_name == blank or product_url == blank -%}
+  {% abort_message('EM_BROWSE_S1: no product name or URL from catalog or event') %}
+{%- endif -%}
+{%- if product_url contains '?' -%}{%- assign sep = '&amp;' -%}{%- else -%}{%- assign sep = '?' -%}{%- endif -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Still thinking it over, {{fname}}?</h1>
+<p>Here's the {{product_name}}, right where you left it.</p>
+{%- if product_img != blank %}
+<a href="{{product_url}}{{sep}}utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_BROWSE_S1"><img src="{{product_img}}" alt="{{product_name | escape}}" width="480" style="max-width:100%;height:auto;"></a>
+{%- endif %}
+<p><strong>{{product_name}}</strong>{% if item.price_display != blank %}<br>{{item.price_display}}{% endif %}</p>
+<p><a href="{{product_url}}{{sep}}utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_BROWSE_S1">Take another look</a></p>
+<p>Free returns for 60 days, so there's no risk in trying it.</p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} =================== END EM_BROWSE_S1 =================== {% endcomment %}
+
+
+{% comment %} ================== BEGIN EM_BROWSE_S2 ==================
+ Step 2 · T+24h · Email · social proof for the viewed product
+ Subject:   What people say about the {{product_name}}
+            (subject-field Liquid:
+             What people say about the {{canvas_entry_properties.${name} | strip | default: 'gear you viewed'}})
+ Preheader: Real reviews from verified buyers.
+ Uses product reviews only when there are at least 3; otherwise the
+ brand-level fallback block. Never renders "0 reviews" or empty stars.
+{% endcomment %}
+{%- assign pid = canvas_entry_properties.${product_id} | strip -%}
+{%- if pid == blank -%}
+  {% abort_message('EM_BROWSE_S2: product_id missing from entry properties') %}
+{%- endif -%}
+{% catalog_items products {{pid}} %}
+{%- assign item = items[0] -%}
+{%- if item != blank and item.in_stock == false -%}
+  {% abort_message('EM_BROWSE_S2: product out of stock') %}
+{%- endif -%}
+{%- assign product_name = item.name | default: canvas_entry_properties.${name} | strip -%}
+{%- assign product_url = item.url | default: canvas_entry_properties.${url} | strip -%}
+{%- if product_name == blank or product_url == blank -%}
+  {% abort_message('EM_BROWSE_S2: no product name or URL from catalog or event') %}
+{%- endif -%}
+{%- if product_url contains '?' -%}{%- assign sep = '&amp;' -%}{%- else -%}{%- assign sep = '?' -%}{%- endif -%}
+{%- assign review_count = item.review_count | default: 0 | plus: 0 -%}
+{%- assign rating = item.rating | default: 0 | plus: 0 -%}
+{%- assign top_review = item.top_review | strip | default: '' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Don't take our word for it.</h1>
+{%- if review_count >= 3 and rating > 0 %}
+<p>The {{product_name}} has a {{rating | round: 1}} out of 5 rating from {{review_count}} verified buyers.</p>
+{%- if top_review != blank %}
+<blockquote>&ldquo;{{top_review | escape | truncate: 220}}&rdquo;</blockquote>
+{%- endif %}
+{%- else %}
+{{content_blocks.${CB_BROWSE_SOCIAL_PROOF_FALLBACK}}}
+{%- endif %}
+<p><a href="{{product_url}}{{sep}}utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_BROWSE_S2">See the {{product_name}}</a></p>
+<p>Every order ships free over $50 and comes with 60-day returns.</p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} =================== END EM_BROWSE_S2 =================== {% endcomment %}

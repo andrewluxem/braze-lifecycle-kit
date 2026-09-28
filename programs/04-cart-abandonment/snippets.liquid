@@ -1,0 +1,266 @@
+{% comment %}
+=====================================================================
+ 04 · Cart Abandonment · snippets.liquid
+ Canvas: CANVAS | Cart Abandonment | v1
+ Brand:  Northwind Supply Co. (fictional)
+
+ Live cart pattern (used in every email and push block)
+ 1. Fetch the live cart from the commerce API with Connected Content,
+    authenticated by the stored credential `northwind_cart_api`
+    (never put a key in Liquid). :retry retries once on 5xx.
+ 2. If the API answers 200: use it. Empty cart => abort.
+ 3. If the API fails (non-200 or no body): fall back to the entry
+    snapshot {{canvas_entry_properties.${items}}}, hide per-item prices,
+    and show the entry cart_total labeled as a point-in-time figure.
+ 4. If both are empty: abort.
+ The fetch block is repeated in each message on purpose: variables do
+ not carry between canvas steps.
+=====================================================================
+{% endcomment %}
+
+
+{% comment %} =================== BEGIN EM_CART_S1 ===================
+ Step 1 · T+1h · Email · reminder with live line items
+ Subject:   You left something in your cart
+ Preheader: Your items are saved. Checkout takes a minute.
+{% endcomment %}
+{%- assign cart_id = canvas_entry_properties.${cart_id} | strip -%}
+{%- if cart_id == blank -%}
+  {% abort_message('EM_CART_S1: cart_id missing') %}
+{%- endif -%}
+{% connected_content https://api.example.com/v1/carts/{{cart_id | url_encode}} :method get :basic_auth northwind_cart_api :content_type application/json :retry :save live_cart %}
+{%- assign live_ok = false -%}
+{%- if live_cart.__http_status_code__ == 200 and live_cart.items != nil -%}
+  {%- assign live_ok = true -%}
+  {%- if live_cart.items.size == 0 -%}
+    {% abort_message('EM_CART_S1: live cart is empty') %}
+  {%- endif -%}
+  {%- assign cart_items = live_cart.items -%}
+{%- else -%}
+  {%- assign cart_items = canvas_entry_properties.${items} -%}
+  {%- if cart_items == blank or cart_items.size == 0 -%}
+    {% abort_message('EM_CART_S1: cart API failed and entry items empty') %}
+  {%- endif -%}
+{%- endif -%}
+{%- comment -%} Format the entry cart_total as $X.XX for the fallback path {%- endcomment -%}
+{%- assign cents = canvas_entry_properties.${cart_total} | default: 0 | times: 100 | round -%}
+{%- assign dollars = cents | divided_by: 100 -%}
+{%- assign rem = cents | modulo: 100 -%}
+{%- if rem < 10 -%}{%- assign rem = rem | prepend: '0' -%}{%- endif -%}
+{%- assign entry_total_display = '$' | append: dollars | append: '.' | append: rem -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Your cart is saved, {{fname}}.</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+{%- for line in cart_items limit: 5 -%}
+{%- assign line_name = line.name | strip | default: 'Item in your cart' -%}
+{%- assign line_qty = line.quantity | default: 1 -%}
+  <tr>
+    <td width="96">{%- if line.image_url != blank -%}<img src="{{line.image_url}}" alt="{{line_name | escape}}" width="80" style="display:block;">{%- endif -%}</td>
+    <td>
+      <strong>{{line_name | escape}}</strong><br>
+      Qty {{line_qty}}{% if live_ok and line.line_total_display != blank %} &middot; {{line.line_total_display}}{% endif %}
+    </td>
+  </tr>
+{%- endfor -%}
+</table>
+{%- if cart_items.size > 5 %}
+<p>Plus {{cart_items.size | minus: 5}} more in your cart.</p>
+{%- endif %}
+{%- if live_ok and live_cart.subtotal_display != blank %}
+<p>Subtotal: <strong>{{live_cart.subtotal_display}}</strong></p>
+{%- elsif cents > 0 %}
+<p>Cart total at the time you added it: <strong>{{entry_total_display}}</strong></p>
+{%- endif %}
+<p><a href="https://www.example.com/cart?cid={{cart_id | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_CART_S1" style="display:inline-block;padding:14px 28px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:bold;">Return to my cart</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ==================== END EM_CART_S1 ==================== {% endcomment %}
+
+
+{% comment %} =================== BEGIN PSH_CART_S1 ==================
+ Step 1 · T+1h · Push · same Message step as EM_CART_S1
+ Title field: Your cart is saved
+ Body field:  (below)
+ On-click:    northwind://cart/{{cart_id | url_encode}} (see bottom)
+{% endcomment %}
+{%- assign cart_id = canvas_entry_properties.${cart_id} | strip -%}
+{%- if cart_id == blank -%}
+  {% abort_message('PSH_CART_S1: cart_id missing') %}
+{%- endif -%}
+{% connected_content https://api.example.com/v1/carts/{{cart_id | url_encode}} :method get :basic_auth northwind_cart_api :content_type application/json :retry :save live_cart %}
+{%- if live_cart.__http_status_code__ == 200 and live_cart.items != nil -%}
+  {%- assign cart_items = live_cart.items -%}
+{%- else -%}
+  {%- assign cart_items = canvas_entry_properties.${items} -%}
+{%- endif -%}
+{%- if cart_items == blank or cart_items.size == 0 -%}
+  {% abort_message('PSH_CART_S1: no cart items') %}
+{%- endif -%}
+{%- assign first_name_item = cart_items[0].name | strip | default: 'Your pick' | truncate: 40 -%}
+{%- assign others = cart_items.size | minus: 1 -%}
+{{first_name_item}}{% if others == 1 %} and 1 more item are{% elsif others > 1 %} and {{others}} more items are{% else %} is{% endif %} waiting in your cart. Tap to check out.
+{% comment %} On-click deep link (paste into the on-click URL field): {% endcomment %}
+northwind://cart/{{canvas_entry_properties.${cart_id} | strip | url_encode}}
+{% comment %} ==================== END PSH_CART_S1 ==================== {% endcomment %}
+
+
+{% comment %} =================== BEGIN SMS_CART_S1 ==================
+ Step 1 · T+1h · SMS · sms-consented path only
+ Sends only when entry cart_total >= 75. Keep under 160 GSM characters.
+ Braze link shortening ON. Opt-out language required.
+{% endcomment %}
+{%- assign total = canvas_entry_properties.${cart_total} | default: 0 | plus: 0 -%}
+{%- if total < 75 -%}
+  {% abort_message('SMS_CART_S1: cart_total under 75') %}
+{%- endif -%}
+{%- assign cart_id = canvas_entry_properties.${cart_id} | strip -%}
+{%- if cart_id == blank -%}
+  {% abort_message('SMS_CART_S1: cart_id missing') %}
+{%- endif -%}
+Northwind: your cart is saved. Finish checkout here: https://www.example.com/cart?cid={{cart_id | url_encode}} Reply STOP to opt out.
+{% comment %} ==================== END SMS_CART_S1 ==================== {% endcomment %}
+
+
+{% comment %} =================== BEGIN EM_CART_S2 ===================
+ Step 2 · T+24h · Email · objection handling
+ Subject:   Questions before you check out?
+ Preheader: Shipping, returns, and what buyers say.
+{% endcomment %}
+{%- assign cart_id = canvas_entry_properties.${cart_id} | strip -%}
+{%- if cart_id == blank -%}
+  {% abort_message('EM_CART_S2: cart_id missing') %}
+{%- endif -%}
+{% connected_content https://api.example.com/v1/carts/{{cart_id | url_encode}} :method get :basic_auth northwind_cart_api :content_type application/json :retry :save live_cart %}
+{%- assign live_ok = false -%}
+{%- if live_cart.__http_status_code__ == 200 and live_cart.items != nil -%}
+  {%- assign live_ok = true -%}
+  {%- if live_cart.items.size == 0 -%}
+    {% abort_message('EM_CART_S2: live cart is empty') %}
+  {%- endif -%}
+  {%- assign cart_items = live_cart.items -%}
+{%- else -%}
+  {%- assign cart_items = canvas_entry_properties.${items} -%}
+  {%- if cart_items == blank or cart_items.size == 0 -%}
+    {% abort_message('EM_CART_S2: cart API failed and entry items empty') %}
+  {%- endif -%}
+{%- endif -%}
+{%- assign lead_pid = cart_items[0].product_id | strip -%}
+{%- assign lead_name = cart_items[0].name | strip | default: 'the item in your cart' -%}
+{%- if lead_pid != blank -%}
+  {% catalog_items products {{lead_pid}} %}
+  {%- assign lead = items[0] -%}
+{%- endif -%}
+{%- assign review_count = lead.review_count | default: 0 | plus: 0 -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Anything we can answer, {{fname}}?</h1>
+<p>Your cart still has {{lead_name | escape}}{% if cart_items.size > 1 %} and {{cart_items.size | minus: 1}} more{% endif %}. Here's what most people want to know before they buy.</p>
+{%- if review_count >= 3 and lead.top_review != blank %}
+<p><strong>What buyers say about {{lead_name | escape}}</strong> ({{lead.rating | default: 0 | round: 1}}/5 from {{review_count}} reviews):</p>
+<blockquote>&ldquo;{{lead.top_review | escape | truncate: 220}}&rdquo;</blockquote>
+{%- endif %}
+{%- if live_ok and live_cart.free_shipping_remaining_display != blank %}
+<p>You're {{live_cart.free_shipping_remaining_display}} away from free shipping.</p>
+{%- endif %}
+{{content_blocks.${CB_CART_SERVICE_PROMISES}}}
+<p><a href="https://www.example.com/cart?cid={{cart_id | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_CART_S2">Back to my cart</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ==================== END EM_CART_S2 ==================== {% endcomment %}
+
+
+{% comment %} =================== BEGIN EM_CART_S3A ==================
+ Step 3A · T+72h · Email · fenced incentive (not discount-abusers)
+ Subject:   A little something for your cart
+ Preheader: 10% off, one use, for the next 48 hours.
+ Margin fence: live API must answer 200 with margin_eligible == true
+ and subtotal >= 40. The promotion tag sits inside the eligible branch
+ only, so an ineligible cart never consumes a code. If the API fails,
+ the fence fails closed: no code.
+{% endcomment %}
+{%- assign cart_id = canvas_entry_properties.${cart_id} | strip -%}
+{%- if cart_id == blank -%}
+  {% abort_message('EM_CART_S3A: cart_id missing') %}
+{%- endif -%}
+{% connected_content https://api.example.com/v1/carts/{{cart_id | url_encode}} :method get :basic_auth northwind_cart_api :content_type application/json :retry :save live_cart %}
+{%- assign live_ok = false -%}
+{%- if live_cart.__http_status_code__ == 200 and live_cart.items != nil -%}
+  {%- assign live_ok = true -%}
+  {%- if live_cart.items.size == 0 -%}
+    {% abort_message('EM_CART_S3A: live cart is empty') %}
+  {%- endif -%}
+  {%- assign cart_items = live_cart.items -%}
+{%- else -%}
+  {%- assign cart_items = canvas_entry_properties.${items} -%}
+  {%- if cart_items == blank or cart_items.size == 0 -%}
+    {% abort_message('EM_CART_S3A: cart API failed and entry items empty') %}
+  {%- endif -%}
+{%- endif -%}
+{%- assign subtotal = live_cart.subtotal | default: 0 | plus: 0 -%}
+{%- assign eligible = false -%}
+{%- if live_ok and live_cart.margin_eligible == true and subtotal >= 40 -%}
+  {%- assign eligible = true -%}
+{%- endif -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+{%- if eligible -%}
+  {%- capture cart_code -%}{% promotion('northwind_cart10') %}{%- endcapture -%}
+  {%- assign cart_code = cart_code | strip -%}
+  {%- if cart_code == blank -%}
+    {% abort_message('EM_CART_S3A: promotion list northwind_cart10 empty') %}
+  {%- endif -%}
+  {%- assign expires_ts = 'now' | date: '%s' | plus: 172800 -%}
+  {%- assign tz = ${time_zone} | default: 'America/Chicago' -%}
+  {%- assign expires_on = expires_ts | time_zone: tz | date: '%A at %-I:%M %p' %}
+<h1>{{fname}}, here's 10% off your cart.</h1>
+<p>Use <strong style="font-size:20px;letter-spacing:2px;">{{cart_code}}</strong> at checkout. One use, expires {{expires_on}}.</p>
+<p><a href="https://www.example.com/cart?cid={{cart_id | url_encode}}&amp;promo={{cart_code | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_CART_S3A" style="display:inline-block;padding:14px 28px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:bold;">Apply my code</a></p>
+{%- else %}
+<h1>Your cart is still here, {{fname}}.</h1>
+<p>We saved everything, and checkout takes about a minute.</p>
+<p><a href="https://www.example.com/cart?cid={{cart_id | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_CART_S3A&amp;utm_content=nocode" style="display:inline-block;padding:14px 28px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:bold;">Return to my cart</a></p>
+{%- endif %}
+<ul>
+{%- for line in cart_items limit: 3 %}
+  <li>{{line.name | strip | default: 'Item in your cart' | escape}}{% if live_ok and line.low_stock == true %} (only a few left){% endif %}</li>
+{%- endfor %}
+</ul>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ==================== END EM_CART_S3A ==================== {% endcomment %}
+
+
+{% comment %} =================== BEGIN EM_CART_S3B ==================
+ Step 3B · T+72h · Email · no incentive (discount-abusers)
+ Subject:   Your cart is still saved
+ Preheader: Everything's where you left it.
+ No code, no urgency beyond real low-stock flags.
+{% endcomment %}
+{%- assign cart_id = canvas_entry_properties.${cart_id} | strip -%}
+{%- if cart_id == blank -%}
+  {% abort_message('EM_CART_S3B: cart_id missing') %}
+{%- endif -%}
+{% connected_content https://api.example.com/v1/carts/{{cart_id | url_encode}} :method get :basic_auth northwind_cart_api :content_type application/json :retry :save live_cart %}
+{%- assign live_ok = false -%}
+{%- if live_cart.__http_status_code__ == 200 and live_cart.items != nil -%}
+  {%- assign live_ok = true -%}
+  {%- if live_cart.items.size == 0 -%}
+    {% abort_message('EM_CART_S3B: live cart is empty') %}
+  {%- endif -%}
+  {%- assign cart_items = live_cart.items -%}
+{%- else -%}
+  {%- assign cart_items = canvas_entry_properties.${items} -%}
+  {%- if cart_items == blank or cart_items.size == 0 -%}
+    {% abort_message('EM_CART_S3B: cart API failed and entry items empty') %}
+  {%- endif -%}
+{%- endif -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Your cart is still here, {{fname}}.</h1>
+<ul>
+{%- for line in cart_items limit: 3 %}
+  <li>{{line.name | strip | default: 'Item in your cart' | escape}}{% if live_ok and line.low_stock == true %} (only a few left){% endif %}</li>
+{%- endfor %}
+</ul>
+{{content_blocks.${CB_CART_SERVICE_PROMISES}}}
+<p><a href="https://www.example.com/cart?cid={{cart_id | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_CART_S3B">Return to my cart</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ==================== END EM_CART_S3B ==================== {% endcomment %}

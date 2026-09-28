@@ -1,0 +1,244 @@
+{% comment %}
+=====================================================================
+ 05 · Post-Purchase · snippets.liquid
+ Campaign: TRX_ORDER_CONFIRMATION (API-triggered, transactional)
+ Canvas:   CANVAS | Post-Purchase | v1
+ Brand:    Northwind Supply Co. (fictional)
+
+ Where data comes from
+ - TRX_ORDER_CONFIRMATION: {{api_trigger_properties.${name}}}, sent
+   by the order system in the /campaigns/trigger/send call.
+ - Canvas steps: {{canvas_entry_properties.${name}}} from the purchase
+   that caused entry (order-level properties ride on every line).
+ - Cross-sell: Connected Content to the recommendations API with the
+   stored credential `northwind_recs_api`, static fallback on failure.
+=====================================================================
+{% endcomment %}
+
+
+{% comment %} ============= BEGIN TRX_ORDER_CONFIRMATION ==============
+ Transactional · immediately · Email · separate API-triggered campaign
+ Subject:   Order {{order_number}} confirmed
+            (subject-field Liquid:
+             Order {{api_trigger_properties.${order_number} | default: ''}} confirmed)
+ Preheader: Thanks for your order. Here are the details.
+ Transactional rules: no promotions, no cross-sell, no control group.
+ Aborts without an order number: a confirmation that cannot say which
+ order it confirms creates support tickets instead of preventing them.
+{% endcomment %}
+{%- assign order_number = api_trigger_properties.${order_number} | strip -%}
+{%- if order_number == blank -%}
+  {% abort_message('TRX_ORDER_CONFIRMATION: order_number missing') %}
+{%- endif -%}
+{%- assign lines = api_trigger_properties.${items} -%}
+{%- if lines == blank or lines.size == 0 -%}
+  {% abort_message('TRX_ORDER_CONFIRMATION: no line items') %}
+{%- endif -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_TRX_HEADER}}}
+<h1>Thanks, {{fname}}. Your order is confirmed.</h1>
+<p>Order number: <strong>{{order_number | escape}}</strong></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+{%- for line in lines %}
+  <tr>
+    <td>{{line.name | strip | default: 'Item' | escape}} &times; {{line.quantity | default: 1}}</td>
+    <td align="right">{{line.line_total_display | default: ''}}</td>
+  </tr>
+{%- endfor %}
+</table>
+{%- if api_trigger_properties.${total_display} != blank %}
+<p>Total: <strong>{{api_trigger_properties.${total_display}}}</strong></p>
+{%- endif %}
+{%- if api_trigger_properties.${ship_to_summary} != blank %}
+<p>Shipping to: {{api_trigger_properties.${ship_to_summary} | escape}}</p>
+{%- endif %}
+<p>Estimated delivery: {{api_trigger_properties.${delivery_estimate_display} | default: 'we will email you when it ships'}}</p>
+<p><a href="https://www.example.com/account/orders/{{order_number | url_encode}}">View your order</a></p>
+{{content_blocks.${CB_TRX_FOOTER}}}
+{% comment %} ============== END TRX_ORDER_CONFIRMATION =============== {% endcomment %}
+
+
+{% comment %} ============== BEGIN UPD_POSTPURCH_FLAGS ================
+ Canvas · first step after control split · User Update · Advanced JSON
+ Copies entry properties onto the profile so later Decision Splits and
+ step 4A can use them. Paste the JSON only.
+{% endcomment %}
+{"attributes": [{"last_order_has_consumable": {% if canvas_entry_properties.${has_consumable} == true %}true{% else %}false{% endif %}, "postpurch_entry_order_at": "{{canvas_entry_properties.${ordered_at} | default: 'now' | date: '%Y-%m-%dT%H:%M:%SZ'}}"}]}
+{% comment %} =============== END UPD_POSTPURCH_FLAGS ================= {% endcomment %}
+
+
+{% comment %} ================ BEGIN EM_POSTPURCH_S1 =================
+ Step 1 · T+2d · Email · shipping status + how to get the most from it
+ Subject:   Getting ready for your Northwind order
+ Preheader: Setup tips and care guides for what you bought.
+ Uses the first item's catalog care guide; falls back to the general
+ help center. No selling in this email.
+{% endcomment %}
+{%- assign lines = canvas_entry_properties.${items} -%}
+{%- if lines == blank or lines.size == 0 -%}
+  {% abort_message('EM_POSTPURCH_S1: no items in entry properties') %}
+{%- endif -%}
+{%- assign order_at = canvas_entry_properties.${ordered_at} | default: 'now' | date: '%s' | plus: 0 -%}
+{%- assign delivered_at = custom_attribute.${last_delivery_confirmed_at} | default: '1970-01-01T00:00:00Z' | date: '%s' | plus: 0 -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+{%- if delivered_at > order_at %}
+<h1>It's arrived, {{fname}}. Here's how to get started.</h1>
+{%- else %}
+<h1>Your order is on its way, {{fname}}.</h1>
+<p>You'll get a tracking email from our shipping partner. In the meantime, here's how to get the most out of what you bought.</p>
+{%- endif %}
+<ul>
+{%- for line in lines limit: 4 -%}
+  {%- assign pid = line.product_id | strip -%}
+  {%- assign guide = '' -%}
+  {%- if pid != blank -%}
+    {% catalog_items products {{pid}} %}
+    {%- assign guide = items[0].care_guide_url | strip | default: '' -%}
+  {%- endif -%}
+  {%- if guide == blank -%}{%- assign guide = 'https://www.example.com/help' -%}{%- endif %}
+  <li><a href="{{guide}}?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_POSTPURCH_S1">{{line.name | strip | default: 'Your item' | escape}}: setup and care guide</a></li>
+{%- endfor %}
+</ul>
+{{content_blocks.${CB_POSTPURCH_SUPPORT}}}
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================= END EM_POSTPURCH_S1 ================== {% endcomment %}
+
+
+{% comment %} ================ BEGIN EM_POSTPURCH_S2 =================
+ Step 2 · delivery + 5d (else T+10d) · Email · review request
+ Subject:   How's it working out?
+ Preheader: Tap a star. It takes ten seconds.
+ One review link per item, maximum 4. No incentive for reviewing.
+ Aborts if a return or ticket opened between the split and the send.
+{% endcomment %}
+{%- if custom_attribute.${has_open_return} == true or custom_attribute.${has_open_support_ticket} == true -%}
+  {% abort_message('EM_POSTPURCH_S2: open return or support ticket') %}
+{%- endif -%}
+{%- assign lines = canvas_entry_properties.${items} -%}
+{%- assign order_id = canvas_entry_properties.${order_id} | strip -%}
+{%- if lines == blank or lines.size == 0 or order_id == blank -%}
+  {% abort_message('EM_POSTPURCH_S2: items or order_id missing') %}
+{%- endif -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>{{fname}}, how's it working out?</h1>
+<p>Your review helps other people pick the right gear, and it tells us what to fix. Tap a star to start.</p>
+{%- for line in lines limit: 4 -%}
+{%- assign pid = line.product_id | strip -%}
+{%- if pid != blank %}
+<p><strong>{{line.name | strip | default: 'Your item' | escape}}</strong><br>
+{%- for star in (1..5) -%}
+<a href="https://www.example.com/review/{{pid | url_encode}}?order={{order_id | url_encode}}&amp;rating={{star}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_POSTPURCH_S2" style="font-size:28px;text-decoration:none;color:#f5a623;" aria-label="{{star}} out of 5 stars">&#9733;</a>
+{%- endfor -%}
+</p>
+{%- endif -%}
+{%- endfor %}
+<p>Something not right? <a href="https://www.example.com/help/contact?order={{order_id | url_encode}}">Tell our support team</a> and we'll sort it out.</p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================= END EM_POSTPURCH_S2 ================== {% endcomment %}
+
+
+{% comment %} ================ BEGIN EM_POSTPURCH_S3 =================
+ Step 3 · about T+21d · Email · cross-sell via Connected Content
+ Subject:   Goes well with your {{first item}}
+            (subject-field Liquid:
+             Goes well with your {{canvas_entry_properties.${items}[0].name | strip | default: 'recent order'}})
+ Preheader: Picked to pair with what you already have.
+ Max 3 products. Purchased items are excluded in the API call AND
+ filtered again here. Any API failure renders the static fallback.
+{% endcomment %}
+{%- assign lines = canvas_entry_properties.${items} -%}
+{%- assign exclude_list = lines | map: 'product_id' -%}
+{%- assign exclude_param = exclude_list | join: ',' | url_encode -%}
+{% connected_content https://api.example.com/v1/recommendations?user={{${user_id} | url_encode}}&exclude={{exclude_param}}&limit=6 :method get :basic_auth northwind_recs_api :content_type application/json :cache_max_age 900 :retry :save recs %}
+{%- assign shown = 0 -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>{{fname}}, these pair well with your last order.</h1>
+{%- if recs.__http_status_code__ == 200 and recs.products != nil and recs.products.size > 0 %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+{%- for p in recs.products -%}
+  {%- if shown < 3 and p.product_id != blank and p.url != blank -%}
+    {%- unless exclude_list contains p.product_id -%}
+      {%- assign shown = shown | plus: 1 %}
+  <td width="33%" valign="top" style="padding:8px;">
+    <a href="{{p.url}}?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_POSTPURCH_S3">{%- if p.image_url != blank -%}<img src="{{p.image_url}}" alt="{{p.name | strip | default: 'Recommended item' | escape}}" width="160" style="max-width:100%;height:auto;display:block;">{%- endif -%}</a>
+    <p><strong>{{p.name | strip | default: 'Recommended for you' | escape}}</strong>{% if p.price_display != blank %}<br>{{p.price_display}}{% endif %}</p>
+  </td>
+    {%- endunless -%}
+  {%- endif -%}
+{%- endfor %}
+</tr></table>
+{%- endif %}
+{%- if shown == 0 %}
+{{content_blocks.${CB_POSTPURCH_CROSSSELL_FALLBACK}}}
+{%- endif %}
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================= END EM_POSTPURCH_S3 ================== {% endcomment %}
+
+
+{% comment %} ================ BEGIN EM_POSTPURCH_S4A ================
+ Step 4A · about T+45d · Email · replenishment (consumables)
+ Subject:   Running low?
+ Preheader: Reorder in one click, same as last time.
+ Aborts if the customer has reordered since this canvas started, or
+ if the order had no consumable lines to show.
+{% endcomment %}
+{%- assign entry_at = custom_attribute.${postpurch_entry_order_at} | default: 'now' | date: '%s' | plus: 0 -%}
+{%- assign last_order = custom_attribute.${last_order_at} | default: '1970-01-01T00:00:00Z' | date: '%s' | plus: 0 -%}
+{%- assign cutoff = entry_at | plus: 86400 -%}
+{%- if last_order > cutoff -%}
+  {% abort_message('EM_POSTPURCH_S4A: customer already reordered') %}
+{%- endif -%}
+{%- assign lines = canvas_entry_properties.${items} -%}
+{%- assign consumables = 0 -%}
+{%- for line in lines -%}{%- if line.is_consumable == true -%}{%- assign consumables = consumables | plus: 1 -%}{%- endif -%}{%- endfor -%}
+{%- if consumables == 0 -%}
+  {% abort_message('EM_POSTPURCH_S4A: no consumable lines') %}
+{%- endif -%}
+{%- assign order_id = canvas_entry_properties.${order_id} | strip -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>{{fname}}, time to restock?</h1>
+<p>Based on your last order, you might be getting low on:</p>
+<ul>
+{%- for line in lines -%}
+{%- if line.is_consumable == true %}
+  <li>{{line.name | strip | default: 'Your item' | escape}}</li>
+{%- endif -%}
+{%- endfor %}
+</ul>
+{%- if order_id != blank %}
+<p><a href="https://www.example.com/reorder?order={{order_id | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_POSTPURCH_S4A" style="display:inline-block;padding:14px 28px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:bold;">Reorder these items</a></p>
+{%- else %}
+<p><a href="https://www.example.com/account/orders?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_POSTPURCH_S4A">See your past orders</a></p>
+{%- endif %}
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================= END EM_POSTPURCH_S4A ================= {% endcomment %}
+
+
+{% comment %} ================ BEGIN EM_POSTPURCH_S4B ================
+ Step 4B · about T+45d · Email · next-category nudge (durables)
+ Subject:   The next piece of your kit
+ Preheader: What people add after the {{first item}}.
+ Uses the first item's category to pick a curated content block
+ (CB_POSTPURCH_NEXT_<CATEGORY>), falling back to a general block.
+{% endcomment %}
+{%- assign lines = canvas_entry_properties.${items} -%}
+{%- assign cat = lines[0].category | strip | upcase | replace: ' ', '_' | replace: '-', '_' | default: '' -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>{{fname}}, here's what usually comes next.</h1>
+{%- case cat -%}
+  {%- when 'CAMPING' -%}
+{{content_blocks.${CB_POSTPURCH_NEXT_CAMPING}}}
+  {%- when 'CLIMBING' -%}
+{{content_blocks.${CB_POSTPURCH_NEXT_CLIMBING}}}
+  {%- when 'APPAREL' -%}
+{{content_blocks.${CB_POSTPURCH_NEXT_APPAREL}}}
+  {%- else -%}
+{{content_blocks.${CB_POSTPURCH_NEXT_CATEGORY_FALLBACK}}}
+{%- endcase %}
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================= END EM_POSTPURCH_S4B ================= {% endcomment %}

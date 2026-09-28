@@ -1,0 +1,92 @@
+{% comment %}
+=====================================================================
+ 02 · Double Opt-In · snippets.liquid
+ Canvas A: CANVAS | Double Opt-In Request | v1
+ Canvas B: CANVAS | Double Opt-In Confirm | v1
+ Brand:    Northwind Supply Co. (fictional)
+
+ Rules for this program
+ - Confirmation emails contain no promotional content. One button.
+ - The Confirm link must carry link alias `confirm-subscription`
+   (set in the email editor's Link Management tab, per message).
+ - Entry properties: {{canvas_entry_properties.${name}}}.
+=====================================================================
+{% endcomment %}
+
+
+{% comment %} ==================== BEGIN EM_DOI_S1 ====================
+ Canvas A · Step 1 · T+0 · Email · confirmation request
+ Subject:   Confirm your Northwind subscription
+ Preheader: One click and you're in. This link expires in 7 days.
+ Confirm link alias: confirm-subscription
+{% endcomment %}
+{%- assign source = canvas_entry_properties.${signup_source} | default: 'general' | downcase -%}
+{{content_blocks.${CB_GLOBAL_HEADER_MINIMAL}}}
+<h1>One click to confirm.</h1>
+{%- if source == 'checkout' -%}
+<p>You asked for Northwind emails when you checked out. Confirm below and we'll start sending.</p>
+{%- else -%}
+<p>You (or someone using this address) asked to join the Northwind Supply Co. email list. Confirm below and we'll start sending.</p>
+{%- endif %}
+<p><a href="https://www.example.com/subscribe/confirmed?src={{source | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_DOI_S1" style="display:inline-block;padding:14px 28px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:bold;">Confirm my subscription</a></p>
+<p>What you'll get: gear guides, restock alerts, and member sales, about once a week.</p>
+<p>Didn't sign up? Ignore this email. You won't hear from us again unless you confirm.</p>
+{{content_blocks.${CB_GLOBAL_FOOTER_MINIMAL}}}
+{% comment %} ===================== END EM_DOI_S1 ===================== {% endcomment %}
+
+
+{% comment %} ==================== BEGIN EM_DOI_S2 ====================
+ Canvas A · Step 2 · T+48h · Email · reminder (90% path; 10% control gets nothing)
+ Subject:   Still want Northwind emails?
+ Preheader: Your confirmation link expires in 5 days.
+ Confirm link alias: confirm-subscription (set it again on this message)
+ Aborts if the user confirmed between the split and the send.
+{% endcomment %}
+{%- if custom_attribute.${doi_status} == 'confirmed' -%}
+  {% abort_message('EM_DOI_S2: already confirmed') %}
+{%- endif -%}
+{%- assign source = canvas_entry_properties.${signup_source} | default: 'general' | downcase -%}
+{{content_blocks.${CB_GLOBAL_HEADER_MINIMAL}}}
+<h1>Still want in?</h1>
+<p>Two days ago you asked to join the Northwind list, but we haven't heard back. If you still want gear guides and restock alerts, confirm below. The link expires in 5 days.</p>
+<p><a href="https://www.example.com/subscribe/confirmed?src={{source | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_DOI_S2" style="display:inline-block;padding:14px 28px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:bold;">Yes, confirm my subscription</a></p>
+<p>Changed your mind? Do nothing. This is the last reminder.</p>
+{{content_blocks.${CB_GLOBAL_FOOTER_MINIMAL}}}
+{% comment %} ===================== END EM_DOI_S2 ===================== {% endcomment %}
+
+
+{% comment %} ============ BEGIN FRAGMENT_DOI_CONFIRM_LINK ============
+ Fragment (not sent alone). Hardened variant only. Replace the Confirm
+ link href in EM_DOI_S1
+ and EM_DOI_S2 with this. The page shows a Confirm button that fires
+ `email_confirm_clicked`, so link scanners cannot confirm the address.
+ `doi_token` is a random, single-use token your backend writes to the
+ profile at signup. Aborts if it is missing: a confirm page without a
+ token cannot record consent.
+{% endcomment %}
+{%- assign doi_token = custom_attribute.${doi_token} | strip -%}
+{%- if doi_token == blank -%}
+  {% abort_message('DOI hardened: doi_token missing') %}
+{%- endif -%}
+https://www.example.com/subscribe/confirm?t={{doi_token | url_encode}}&amp;utm_source=braze&amp;utm_medium=email
+{% comment %} ============= END FRAGMENT_DOI_CONFIRM_LINK ============= {% endcomment %}
+
+
+{% comment %} ================= BEGIN UPD_DOI_EXPIRE ==================
+ Canvas A · Step 3 · T+7d · User Update · Advanced JSON
+ Paste the JSON line only. Add "email_subscribe": "unsubscribed" to
+ the object if your policy unsubscribes expired addresses.
+{% endcomment %}
+{"attributes": [{"doi_status": "expired"}]}
+{% comment %} ================== END UPD_DOI_EXPIRE =================== {% endcomment %}
+
+
+{% comment %} ================= BEGIN UPD_DOI_CONFIRM =================
+ Canvas B · Step 1 · On click · User Update · Advanced JSON
+ Required core: {"attributes": [{"email_subscribe": "opted_in"}]}
+ The full payload below also stamps status and time, and logs
+ `email_confirmed`, which exits Canvas A and enters program 01.
+ Paste the JSON only.
+{% endcomment %}
+{"attributes": [{"email_subscribe": "opted_in", "doi_status": "confirmed", "doi_confirmed_at": "{{ 'now' | date: '%Y-%m-%dT%H:%M:%SZ' }}"}], "events": [{"name": "email_confirmed", "time": "{{ 'now' | date: '%Y-%m-%dT%H:%M:%SZ' }}"}]}
+{% comment %} ================== END UPD_DOI_CONFIRM ================== {% endcomment %}

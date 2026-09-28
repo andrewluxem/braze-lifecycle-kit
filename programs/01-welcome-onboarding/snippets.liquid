@@ -1,0 +1,204 @@
+{% comment %}
+=====================================================================
+ 01 · Welcome / Onboarding · snippets.liquid
+ Canvas: CANVAS | Welcome Series | v1
+ Brand:  Northwind Supply Co. (fictional). Replace URLs, list names,
+         and content block names with your own.
+
+ Conventions used in every block below
+ - Entry-event properties: {{canvas_entry_properties.${name}}}.
+   (Canvas Flow exposes the trigger event's properties this way in
+   every step. {{event_properties.${name}}} only works in the first
+   Message step after an Action Path. See library/liquid-snippets.md.)
+ - Every output tag has a default. Blocks that cannot render
+   correctly without their data call abort_message instead of sending.
+ - Dash-trimmed tags trim whitespace so loops and assigns do not
+   leave blank lines in the HTML.
+ - Paste the block between its BEGIN and END markers only.
+=====================================================================
+{% endcomment %}
+
+
+{% comment %} ================= BEGIN EM_WELCOME_S1 =================
+ Step 1 · T+0 · Email · expectation-setting + preference center
+ Subject:   Welcome to Northwind{% if ${first_name} != blank %}, {{${first_name} | strip}}{% endif %}
+ Preheader: Here's what to expect from us (and how to change it).
+{% endcomment %}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{%- assign source = canvas_entry_properties.${signup_source} | default: 'general' | downcase -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Welcome, {{fname}}.</h1>
+{%- case source -%}
+  {%- when 'checkout' -%}
+<p>Thanks for signing up while you checked out. Your order confirmation is on its way separately.</p>
+  {%- when 'popup' or 'footer' -%}
+<p>Thanks for signing up. You're on the list.</p>
+  {%- when 'account' -%}
+<p>Your Northwind account is ready.</p>
+  {%- else -%}
+<p>Thanks for joining Northwind Supply Co.</p>
+{%- endcase %}
+<p>Here's the deal: we email about once a week, twice when there's a real launch. Gear guides, restocks, and the occasional member-only sale. No daily blasts.</p>
+<p>Want fewer emails, or only certain topics? <a href="{{preference_center.${northwind_preferences} | default: 'https://www.example.com/preferences'}}">Set your preferences here</a>. It takes 20 seconds.</p>
+<p><a href="https://www.example.com/shop?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_WELCOME_S1">Browse the shop</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================== END EM_WELCOME_S1 ================== {% endcomment %}
+
+
+{% comment %} ================= BEGIN PSH_WELCOME_S2 ================
+ Step 2a · T+1d · Push (push-enabled users)
+ Title field: Why people stick with Northwind
+ Body field:  (below)
+ On-click:    deep link built below
+{% endcomment %}
+{%- assign cat = canvas_entry_properties.${preferred_category} | default: '' | strip | downcase -%}
+Free 60-day returns, same-day dispatch before 2 p.m., and we match any price. {% if cat != blank %}Start with {{cat | capitalize}}.{% else %}See the bestsellers.{% endif %}
+{% comment %} Deep link (paste into the on-click URL field): {% endcomment %}
+{%- if cat != blank -%}northwind://category/{{cat | url_encode}}{%- else -%}northwind://bestsellers{%- endif -%}
+{% comment %} ================== END PSH_WELCOME_S2 ================= {% endcomment %}
+
+
+{% comment %} ================= BEGIN IAM_WELCOME_S2 ================
+ Step 2b · T+1d · In-app slideup (non-push users) · trigger: session start
+ Expiration: 3 days. Keep under 90 characters for slideups.
+{% endcomment %}
+{%- assign fname = ${first_name} | strip | default: '' -%}
+{% if fname != blank %}{{fname}}, free{% else %}Free{% endif %} 60-day returns and same-day dispatch on every order. Tap to shop bestsellers.
+{% comment %} ================== END IAM_WELCOME_S2 ================= {% endcomment %}
+
+
+{% comment %} ================= BEGIN EM_WELCOME_S3 =================
+ Step 3 · T+3d · Email · social proof
+ Subject:   The three things our customers reorder most
+ Preheader: Real reviews from real orders.
+ Data: product cards come from content block CB_WELCOME_BESTSELLERS,
+       which a merchandiser updates weekly. If that block is ever
+       empty, the static fallback block renders instead.
+{% endcomment %}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{%- capture best -%}{{content_blocks.${CB_WELCOME_BESTSELLERS}}}{%- endcapture -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Hi {{fname}}, here's what people keep coming back for.</h1>
+<p>We could tell you our gear is good. These customers already did.</p>
+{%- if best != blank -%}
+{{best}}
+{%- else -%}
+{{content_blocks.${CB_WELCOME_BESTSELLERS_FALLBACK}}}
+{%- endif %}
+<p><a href="https://www.example.com/about/how-its-made?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_WELCOME_S3">How we make it</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================== END EM_WELCOME_S3 ================== {% endcomment %}
+
+
+{% comment %} ================= BEGIN UPD_WELCOME_S4A ================
+ Step 4A (pre-send) · User Update step · Advanced JSON editor
+ Pulls one single-use code and stamps the send time on the profile.
+ Paste the JSON line only (not this comment).
+{% endcomment %}
+{"attributes": [{"welcome_code": "{% promotion('northwind_welcome10') %}", "welcome_code_sent_at": "{{ 'now' | date: '%Y-%m-%dT%H:%M:%SZ' }}"}]}
+{% comment %} ================== END UPD_WELCOME_S4A ================= {% endcomment %}
+
+
+{% comment %} ================= BEGIN EM_WELCOME_S4A ================
+ Step 4A · T+7d · Email · first-purchase incentive (code variant)
+ Subject:   {{fname}}, 10% off your first order (this week only)
+            (use this Liquid in the subject field:
+             {{${first_name} | strip | default: 'Hey'}}, 10% off your first order, this week only)
+ Preheader: One code, one order, expires in 7 days.
+ Aborts if the code or its timestamp is missing, so nobody receives
+ a blank code or a wrong expiry date. The code is valid through the
+ end of the day shown (the commerce platform expires it at 23:59 on
+ day 7 after issue, store time zone or later). Preview with a test user in a
+ non-UTC time zone to confirm expires_on renders the local date.
+{% endcomment %}
+{%- assign code = custom_attribute.${welcome_code} | strip -%}
+{%- assign sent_at = custom_attribute.${welcome_code_sent_at} -%}
+{%- if code == blank -%}
+  {% abort_message('EM_WELCOME_S4A: welcome_code blank (code list empty or user update failed)') %}
+{%- endif -%}
+{%- if sent_at == blank -%}
+  {% abort_message('EM_WELCOME_S4A: welcome_code_sent_at blank') %}
+{%- endif -%}
+{%- assign expires_ts = sent_at | date: '%s' | plus: 604800 -%}
+{%- assign tz = ${time_zone} | default: 'America/Chicago' -%}
+{%- assign expires_on = expires_ts | time_zone: tz | date: '%A, %B %-d' -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>{{fname}}, here's 10% off your first order.</h1>
+<p>Use this code at checkout:</p>
+<p style="font-size:24px;font-weight:bold;letter-spacing:2px;">{{code}}</p>
+<p>It works once and expires at midnight on {{expires_on}}. Excludes sale items and gift cards.</p>
+<p><a href="https://www.example.com/shop?promo={{code | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_WELCOME_S4A">Shop with your code</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================== END EM_WELCOME_S4A ================= {% endcomment %}
+
+
+{% comment %} ================= BEGIN EM_WELCOME_S4B ================
+ Step 4B · T+7d · Email · no-code variant for discount-abusers
+ Subject:   Free shipping, free returns, no fine print
+ Preheader: The short version of why Northwind is easy to buy from.
+ Rule: no urgency language, no code, no "exclusive" framing.
+{% endcomment %}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Hi {{fname}}, buying from us is low-risk.</h1>
+<p>Free shipping over $50. Free returns for 60 days. If you find it cheaper, we match it.</p>
+{{content_blocks.${CB_WELCOME_BESTSELLERS_FALLBACK}}}
+<p><a href="https://www.example.com/bestsellers?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_WELCOME_S4B">See the bestsellers</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================== END EM_WELCOME_S4B ================= {% endcomment %}
+
+
+{% comment %} ================= BEGIN EM_WELCOME_S5A ================
+ Step 5A · T+14d · Email · expiry nudge (code variant)
+ Subject:   Your 10% code expires tonight
+ Preheader: One order, 10% off, until midnight.
+ Timing: step 4A sends at 10:00 on day 7 and the code is valid through
+ 23:59 local on day 14, so this step (10:00 on day 14) lands on the
+ last valid day.
+ Aborts if the code was redeemed, is missing, or has already expired
+ (for example, the user was frequency-capped and this step is late).
+{% endcomment %}
+{%- if custom_attribute.${welcome_code_redeemed} == true -%}
+  {% abort_message('EM_WELCOME_S5A: code already redeemed') %}
+{%- endif -%}
+{%- assign code = custom_attribute.${welcome_code} | strip -%}
+{%- assign sent_at = custom_attribute.${welcome_code_sent_at} -%}
+{%- if code == blank or sent_at == blank -%}
+  {% abort_message('EM_WELCOME_S5A: code or sent_at missing') %}
+{%- endif -%}
+{%- assign tz = ${time_zone} | default: 'America/Chicago' -%}
+{%- assign expires_ts = sent_at | date: '%s' | plus: 604800 -%}
+{%- assign expires_day = expires_ts | time_zone: tz | date: '%Y%m%d' | plus: 0 -%}
+{%- assign expires_on = expires_ts | time_zone: tz | date: '%A, %B %-d' -%}
+{%- assign today = 'now' | time_zone: tz | date: '%Y%m%d' | plus: 0 -%}
+{%- if today > expires_day -%}
+  {% abort_message('EM_WELCOME_S5A: code already expired') %}
+{%- endif -%}
+{%- if today == expires_day -%}{%- assign when = 'tonight' -%}{%- else -%}{%- assign when = 'soon' -%}{%- endif -%}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>{{fname}}, your code expires {{when}}.</h1>
+<p>Your first-order code <strong>{{code}}</strong> is still unused. It stops working at midnight on {{expires_on}}, and we won't reissue it.</p>
+<p><a href="https://www.example.com/shop?promo={{code | url_encode}}&amp;utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_WELCOME_S5A">Use it now</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================== END EM_WELCOME_S5A ================= {% endcomment %}
+
+
+{% comment %} ================= BEGIN EM_WELCOME_S5B ================
+ Step 5B · T+14d · Email · new arrivals (no-code variant)
+ Subject:   New this month at Northwind
+ Preheader: Fresh gear, same free returns.
+{% endcomment %}
+{%- assign fname = ${first_name} | strip | default: 'there' -%}
+{%- capture arrivals -%}{{content_blocks.${CB_GLOBAL_NEW_ARRIVALS}}}{%- endcapture -%}
+{{content_blocks.${CB_GLOBAL_HEADER}}}
+<h1>Hi {{fname}}, here's what just landed.</h1>
+{%- if arrivals != blank -%}
+{{arrivals}}
+{%- else -%}
+{{content_blocks.${CB_WELCOME_BESTSELLERS_FALLBACK}}}
+{%- endif %}
+<p><a href="https://www.example.com/new?utm_source=braze&amp;utm_medium=email&amp;utm_campaign=EM_WELCOME_S5B">See everything new</a></p>
+{{content_blocks.${CB_GLOBAL_FOOTER}}}
+{% comment %} ================== END EM_WELCOME_S5B ================= {% endcomment %}
