@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/banner.svg" alt="braze-lifecycle-kit: Open-source lifecycle program blueprints for Braze: canvas build recipes, drop-in Liquid, QA checklists, and a Claude Code skill pack. Unofficial; not affiliated with Braze, Inc." width="100%"></p>
+
 # braze-lifecycle-kit
 
 Open-source lifecycle program blueprints for Braze. Twelve retention and lifecycle programs (welcome, cart and browse abandonment, post-purchase, winback, sunset, and more), each written as a strategy brief, a click-by-click canvas build recipe, and drop-in Liquid. A shared library holds the naming taxonomy, segment recipes, QA and deliverability checklists, and a measurement framework. A Claude Code skill pack lets an AI agent draft new programs, audit canvas builds, and review Liquid against the same standards.

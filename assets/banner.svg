@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" role="img" aria-labelledby="t d">
+<title id="t">braze-lifecycle-kit</title>
+<desc id="d">Three panels from the kit's reference program, 04 Cart Abandonment, written for a fictional retailer. 1, the trigger, Custom event added_to_cart, and the brief's point: Most carts are not abandoned because of price. 2, the message map: T+1h Reminder for interrupted shoppers (EM_CART_S1, PSH_CART_S1), T+24h Answer objections (EM_CART_S2), T+72h Close price-sensitive shoppers (EM_CART_S3A with an incentive, EM_CART_S3B without). 3, unticked QA cases from BUILD.md. Unofficial; not affiliated with Braze, Inc.</desc>
+<style>
+.serif{font-family:Georgia,"Times New Roman",serif}
+.sans{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+.lab{font-size:10px;letter-spacing:1.8px;font-weight:600}
+.cap{font-size:11.5px;fill:#8b9096}
+.hl{fill:none;stroke-width:1.5;opacity:0}
+.h1{animation:h1 12s infinite}
+.h2{animation:h2 12s infinite}
+.h3{animation:h3 12s infinite}
+.r1{animation:r1 12s infinite}
+.r2{animation:r2 12s infinite}
+.r3{animation:r3 12s infinite}
+.rb{animation:rb 12s infinite}
+.rc{animation:rc 12s infinite}
+.rd{animation:rd 12s infinite}
+.re{animation:re 12s infinite}
+.rf{animation:rf 12s infinite}
+.rg{animation:rg 12s infinite}
+@keyframes h1{0%,16.7%{opacity:0}18.7%,42.4%{opacity:1}44.1%,100%{opacity:0}}
+@keyframes h2{0%,16.7%,18.7%,44.1%{opacity:0}45.8%,67.8%{opacity:1}69.5%,100%{opacity:0}}
+@keyframes h3{0%,16.7%,18.7%,69.5%{opacity:0}71.2%,94.9%{opacity:1}96.6%,100%{opacity:0}}
+@keyframes r1{0%,16.7%{opacity:1}18.7%,20.4%{opacity:0}22.1%,100%{opacity:1}}
+@keyframes r2{0%,16.7%{opacity:1}18.7%,25.5%{opacity:0}27.2%,100%{opacity:1}}
+@keyframes r3{0%,16.7%{opacity:1}18.7%,32.2%{opacity:0}33.9%,100%{opacity:1}}
+@keyframes rb{0%,16.7%{opacity:1}18.7%,45%{opacity:0}46.6%,100%{opacity:1}}
+@keyframes rc{0%,16.7%{opacity:1}18.7%,52.6%{opacity:0}54.3%,100%{opacity:1}}
+@keyframes rd{0%,16.7%{opacity:1}18.7%,60.2%{opacity:0}61.9%,100%{opacity:1}}
+@keyframes re{0%,16.7%{opacity:1}18.7%,72.1%{opacity:0}73.7%,100%{opacity:1}}
+@keyframes rf{0%,16.7%{opacity:1}18.7%,78.8%{opacity:0}80.5%,100%{opacity:1}}
+@keyframes rg{0%,16.7%{opacity:1}18.7%,85.6%{opacity:0}87.3%,100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+<rect width="900" height="300" fill="#141618"/>
+
+<text x="32" y="50" class="serif" font-size="28" fill="#e4dfd4">braze-lifecycle-kit</text>
+<text x="270" y="50" class="sans" font-size="13.5" fill="#a9adb2">Open-source lifecycle program blueprints for Braze</text>
+
+<g>
+<text x="32" y="88" class="sans lab" fill="#a39bbd">1 · AN ABANDONED CART</text>
+<rect x="32" y="98" width="242" height="152" rx="3" fill="#1b1e21" stroke="#2e3237"/>
+<rect class="hl h1" x="32" y="98" width="242" height="152" rx="3" stroke="#a39bbd"/>
+<text x="44" y="115" class="mono" font-size="10" fill="#8b9096">PROGRAM.md · 04 · Cart Abandonment</text>
+<line x1="33" y1="123" x2="273" y2="123" stroke="#2e3237"/>
+<g class="r1"><text x="44" y="143" class="mono" font-size="10" fill="#8b9096">Trigger</text><text x="96" y="143" class="sans" font-size="10.5" fill="#e4dfd4">Custom event <tspan class="mono" font-size="10">added_to_cart</tspan></text></g>
+<g class="r2"><rect x="44" y="154" width="218" height="46" rx="3" fill="#1f2225" stroke="#353a40"/><rect x="54" y="162" width="12" height="12" rx="1.5" fill="#3d4248"/><rect x="74" y="164" width="120" height="3" fill="#3d4248"/><rect x="74" y="170" width="80" height="3" fill="#3d4248"/><rect x="54" y="180" width="12" height="12" rx="1.5" fill="#3d4248"/><rect x="74" y="182" width="96" height="3" fill="#3d4248"/><rect x="74" y="188" width="56" height="3" fill="#3d4248"/></g>
+<g class="r3"><text x="44" y="223" class="serif" font-size="12" fill="#e4dfd4">Most carts are not abandoned</text><text x="44" y="239" class="serif" font-size="12" fill="#e4dfd4">because of price.</text></g>
+<text x="32" y="272" class="sans cap">A shopper adds to cart and leaves.</text>
+</g>
+
+<g>
+<text x="294" y="88" class="sans lab" fill="#c8963e">2 · A THREE-STEP RECIPE</text>
+<rect x="294" y="98" width="292" height="152" rx="3" fill="#17191c" stroke="#2e3237"/>
+<rect class="hl h2" x="294" y="98" width="292" height="152" rx="3" stroke="#c8963e"/>
+<text x="306" y="115" class="mono" font-size="10" fill="#8b9096">PROGRAM.md · Message map</text>
+<line x1="295" y1="123" x2="585" y2="123" stroke="#2e3237"/>
+<g class="rb"><text x="306" y="143" class="mono" font-size="10" fill="#c8963e" font-weight="700">T+1h</text><text x="352" y="143" class="sans" font-size="10.5" fill="#e4dfd4">Reminder for interrupted shoppers</text><text x="352" y="156" class="mono" font-size="10" fill="#8b9096">EM_CART_S1, PSH_CART_S1</text></g>
+<g class="rc"><text x="306" y="178" class="mono" font-size="10" fill="#c8963e" font-weight="700">T+24h</text><text x="352" y="178" class="sans" font-size="10.5" fill="#e4dfd4">Answer objections</text><text x="352" y="191" class="mono" font-size="10" fill="#8b9096">EM_CART_S2</text></g>
+<g class="rd"><text x="306" y="213" class="mono" font-size="10" fill="#c8963e" font-weight="700">T+72h</text><text x="352" y="213" class="sans" font-size="10.5" fill="#e4dfd4">Close price-sensitive shoppers</text><text x="352" y="226" class="mono" font-size="10" fill="#8b9096">EM_CART_S3A (incentive) /</text><text x="352" y="239" class="mono" font-size="10" fill="#8b9096">EM_CART_S3B (no incentive)</text></g>
+<text x="294" y="272" class="sans cap">Three timed steps; the discount comes last.</text>
+</g>
+
+<g>
+<text x="606" y="88" class="sans lab" fill="#93ad8c">3 · QA BEFORE LAUNCH</text>
+<rect x="606" y="98" width="262" height="152" rx="3" fill="#1b1e21" stroke="#2e3237"/>
+<rect class="hl h3" x="606" y="98" width="262" height="152" rx="3" stroke="#93ad8c"/>
+<text x="618" y="115" class="mono" font-size="10" fill="#8b9096">04-cart-abandonment/BUILD.md</text>
+<line x1="607" y1="123" x2="867" y2="123" stroke="#2e3237"/>
+<g class="re"><rect x="618" y="137.5" width="9" height="9" rx="1.5" fill="none" stroke="#a9adb2"/><text x="634" y="146" class="sans" font-size="10.5" fill="#e4dfd4">Purchase within the first hour: no messages.</text></g>
+<g class="rf"><rect x="618" y="163.5" width="9" height="9" rx="1.5" fill="none" stroke="#a9adb2"/><text x="634" y="172" class="sans" font-size="10.5" fill="#e4dfd4">Staging API returns 200 with an empty</text><text x="634" y="186" class="sans" font-size="10.5" fill="#e4dfd4"><tspan class="mono" font-size="10">items</tspan> array. Step aborts; no email, no push.</text></g>
+<g class="rg"><rect x="618" y="203.5" width="9" height="9" rx="1.5" fill="none" stroke="#a9adb2"/><text x="634" y="212" class="sans" font-size="10.5" fill="#e4dfd4">A <tspan class="mono" font-size="10">discount-abusers</tspan> test user receives</text><text x="634" y="226" class="sans" font-size="10.5" fill="#e4dfd4"><tspan class="mono" font-size="10">EM_CART_S3B</tspan> and no code.</text></g>
+<text x="606" y="272" class="sans" font-size="11.5" fill="#93ad8c">Each failure path has a test to run.</text>
+</g>
+</svg>
