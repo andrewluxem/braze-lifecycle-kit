@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/banner.svg" alt="braze-lifecycle-kit: Open-source lifecycle program blueprints for Braze: canvas build recipes, drop-in Liquid, QA checklists, and a Claude Code skill pack. Unofficial; not affiliated with Braze, Inc." width="100%"></p>
+<p align="center"><img src="docs/banner.svg" alt="braze-lifecycle-kit: Open-source lifecycle program blueprints for Braze: canvas build recipes, drop-in Liquid, QA checklists, and a Claude Code skill pack. Unofficial; not affiliated with Braze, Inc."></p>
 
 # braze-lifecycle-kit
 
